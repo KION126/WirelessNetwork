@@ -19,19 +19,14 @@ ser = serial.Serial(serial_port, baud_rate)
 MOISTURE_THRESHOLD = 200
 
 # 토양 습도 값 읽기
-def read_soil_mosture_sensor():
+def read_soil_moisture_sensor():
     try:
         if ser.in_waiting > 0:
-            # 시리얼 데이터 읽기
             line = ser.readline().decode('utf-8').rstrip()
-            
-            # 데이터 파싱
             parts = line.split(',')
-            distance = float(parts[2])  # 습도 값
-            
-            return distance
-    
-    except ValueError:
+            soil_moisture = float(parts[2])  # 토양 습도 값
+            return soil_moisture
+    except (ValueError, IndexError):
         print("Invalid sensor reading")
         return None
 
@@ -56,23 +51,24 @@ def log_soil_moisture(soil_moisture):
 # 물 공급 함수
 def activate_water_pump():
     GPIO.output(motor_pin, GPIO.LOW)  # 모터 ON
-    time.sleep(2)  # 물을 공급하는 시간
+    time.sleep(2)  # 물 공급 시간
     GPIO.output(motor_pin, GPIO.HIGH)  # 모터 OFF
     log_water_tank_level(get_tank_level_percent())  # 물탱크 수위 기록
 
 # 10분마다 토양 습도 확인 및 저장, 모터 제어
 def monitor_and_control_soil_moisture():
     while True:
-        # 토양 습도 값
-        soil_moisture = read_soil_mosture_sensor()
+        # 토양 습도 값 읽기
+        soil_moisture = read_soil_moisture_sensor()
 
-        # 토양 습도 기록
-        log_soil_moisture(soil_moisture)
+        if soil_moisture is not None:
+            # 토양 습도 기록
+            log_soil_moisture(soil_moisture)
 
-        # 임계값 비교 후 물 공급
-        if soil_moisture < moisture_threshold:
-            print("토양 습도가 임계값 보다 낮음, 모터 작동")
-            activate_water_pump()
+            # 임계값 비교 후 물 공급
+            if soil_moisture < MOISTURE_THRESHOLD:
+                print("토양 습도가 임계값보다 낮음, 모터 작동")
+                activate_water_pump()
 
         time.sleep(600)  # 10분 대기
 
@@ -80,10 +76,10 @@ def monitor_and_control_soil_moisture():
 if __name__ == "__main__":
     try:
         monitor_and_control_soil_moisture()
-        GPIO.cleanup()
-        ser.close()
     except KeyboardInterrupt:
         print("Soil moisture monitoring interrupted.")
-
+    finally:
+        GPIO.cleanup()
+        ser.close()
 
 ```
